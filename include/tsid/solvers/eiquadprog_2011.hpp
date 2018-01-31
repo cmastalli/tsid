@@ -87,6 +87,8 @@
 
 #include <iostream>
 
+#include <tsid/math/fwd.hpp>
+
 namespace Eigen {
 
     // namespace internal {
@@ -118,30 +120,32 @@ namespace Eigen {
         d = J.adjoint() * np;
     }
 
-    inline void update_z(VectorXd& z, const MatrixXd& J, const VectorXd& d,  int iq)
+  inline void update_z(VectorXd& z, const MatrixXd& J, const VectorXd& d,  tsid::math::Index iq)
     {
         z = J.rightCols(z.size()-iq) * d.tail(d.size()-iq);
     }
 
-    inline void update_r(const MatrixXd& R, VectorXd& r, const VectorXd& d, int iq)
+  inline void update_r(const MatrixXd& R, VectorXd& r, const VectorXd& d, tsid::math::Index iq)
     {
         r.head(iq)= R.topLeftCorner(iq,iq).triangularView<Upper>().solve(d.head(iq));
     }
 
-    bool add_constraint(MatrixXd& R, MatrixXd& J, VectorXd& d, int& iq, double& R_norm);
-    void delete_constraint(MatrixXd& R, MatrixXd& J, VectorXi& A, VectorXd& u,  int p, int& iq, int l);
+  bool add_constraint(MatrixXd& R, MatrixXd& J, VectorXd& d, tsid::math::Index & iq, double& R_norm);
+  void delete_constraint(MatrixXd& R, MatrixXd& J, VectorXi& A, VectorXd& u,
+			 tsid::math::Index p, tsid::math::Index& iq, tsid::math::Index l);
 
     /* solve_quadprog2 is used when the Cholesky decomposition of the G matrix is precomputed */
     double solve_quadprog2(LLT<MatrixXd,Lower> &chol,  double c1, VectorXd & g0,
                            const MatrixXd & CE, const VectorXd & ce0,
                            const MatrixXd & CI, const VectorXd & ci0,
-                           VectorXd& x, VectorXi& A, int& q);
+                           VectorXd& x, VectorXi& A, tsid::math::Index& q);
 
     /* solve_quadprog is used for on-demand QP solving */
     inline double solve_quadprog(MatrixXd & G,  VectorXd & g0,
                                  const MatrixXd & CE, const VectorXd & ce0,
                                  const MatrixXd & CI, const VectorXd & ci0,
-                                 VectorXd& x, VectorXi& activeSet, int& activeSetSize){
+                                 VectorXd& x, VectorXi& activeSet, tsid::math::Index& activeSetSize)
+    {
 
         LLT<MatrixXd,Lower> chol(G.cols());
         double c1;
@@ -163,13 +167,13 @@ namespace Eigen {
     inline double solve_quadprog2(LLT<MatrixXd,Lower> &chol,  double c1, VectorXd & g0,
                                   const MatrixXd & CE, const VectorXd & ce0,
                                   const MatrixXd & CI, const VectorXd & ci0,
-                                  VectorXd& x, VectorXi& A, int& q)
+                                  VectorXd& x, VectorXi& A, tsid::math::Index& q)
     {
-        int i, j, k, l; /* indices */
-        int ip, me, mi;
-        int n=g0.size();
-        int p=CE.cols();
-        int m=CI.cols();
+        tsid::math::Index i, k, l; /* indices */
+	tsid::math::Index ip, me, mi;
+	tsid::math::Index n=g0.size();
+	tsid::math::Index p=CE.cols();
+	tsid::math::Index m=CI.cols();
         MatrixXd R(g0.size(),g0.size()), J(g0.size(),g0.size());
 
 
@@ -180,11 +184,11 @@ namespace Eigen {
         double t, t1, t2; /* t is the step length, which is the minimum of the partial step length t1
                            * and the full step length t2 */
 //        VectorXi A(m + p); // Del Prete: active set is now an output parameter
-        if(A.size()!=m+p)
+        if(static_cast<tsid::math::Index>(A.size())!=m+p)
           A.resize(m+p);
         VectorXi A_old(m + p), iai(m + p), iaexcl(m+p);
 //        int q;
-        int iq, iter = 0;
+	tsid::math::Index iq, iter = 0;
 
         me = p; /* number of equality constraints */
         mi = m; /* number of inequality constraints */
@@ -255,7 +259,7 @@ namespace Eigen {
 
             /* compute the new solution value */
             f_value += 0.5 * (t2 * t2) * z.dot(np);
-            A(i) = -i - 1;
+            A(i) = static_cast<VectorXi::Scalar>(-i - 1);
 
             if (!add_constraint(R, J, d, iq, R_norm))
             {
@@ -267,7 +271,7 @@ namespace Eigen {
 
         /* set iai = K \ A */
         for (i = 0; i < mi; i++)
-            iai(i) = i;
+	  iai(i) = static_cast<VectorXi::Scalar>(i);
 
     l1:	iter++;
 #ifdef TRACE_SOLVER
@@ -296,7 +300,7 @@ namespace Eigen {
 #endif
 
 
-        if (std::abs(psi) <= mi * std::numeric_limits<double>::epsilon() * c1 * c2* 100.0)
+        if (std::abs(psi) <= static_cast<double>(mi) * std::numeric_limits<double>::epsilon() * c1 * c2* 100.0)
         {
             /* numerically there are not infeasibilities anymore */
             q = iq;
@@ -328,7 +332,7 @@ namespace Eigen {
         /* set u = (u 0)^T */
         u(iq) = 0.0;
         /* add ip to the active set A */
-        A(iq) = ip;
+        A(iq) = static_cast<VectorXi::Scalar>(ip);
 
 #ifdef TRACE_SOLVER
         std::cerr << "Trying with constraint " << ip << std::endl;
@@ -393,7 +397,7 @@ namespace Eigen {
             /* set u = u +  t * [-r 1) and drop constraint l from the active set A */
             u.head(iq) -= t * r.head(iq);
             u(iq) += t;
-            iai(l) = l;
+            iai(l) = static_cast<VectorXi::Scalar>(l);
             delete_constraint(R, J, A, u, p, iq, l);
 #ifdef TRACE_SOLVER
             std::cerr << " in dual space: "
@@ -439,7 +443,7 @@ namespace Eigen {
                 print_ivector("A", A, iq);
 #endif
                 for (i = 0; i < m; i++)
-                    iai(i) = i;
+		  iai(i) = static_cast<VectorXi::Scalar>(i);
                 for (i = 0; i < iq; i++)
                 {
                     A(i) = A_old(i);
@@ -464,7 +468,7 @@ namespace Eigen {
         print_vector("x", x, n);
 #endif
         /* drop constraint l */
-        iai(l) = l;
+        iai(l) = static_cast<VectorXi::Scalar>(l);
         delete_constraint(R, J, A, u, p, iq, l);
 #ifdef TRACE_SOLVER
         print_matrix("R", R, n);
@@ -480,13 +484,14 @@ namespace Eigen {
     }
 
 
-    inline bool add_constraint(MatrixXd& R, MatrixXd& J, VectorXd& d, int& iq, double& R_norm)
+  inline bool add_constraint(MatrixXd& R, MatrixXd& J, VectorXd& d,
+			     tsid::math::Index& iq,  double& R_norm)
     {
-        int n=J.rows();
+      tsid::math::Index n=J.rows();
 #ifdef TRACE_SOLVER
         std::cerr << "Add constraint " << iq << '/';
 #endif
-        int i, j, k;
+	tsid::math::Index j, k;
         double cc, ss, h, t1, t2, xny;
 
         /* we have to find the Givens rotation which will reduce the element
@@ -546,19 +551,19 @@ namespace Eigen {
     }
 
 
-    inline void delete_constraint(MatrixXd& R, MatrixXd& J, VectorXi& A, VectorXd& u,  int p, int& iq, int l)
+  inline void delete_constraint(MatrixXd& R, MatrixXd& J, VectorXi& A, VectorXd& u,  tsid::math::Index p, tsid::math::Index& iq, tsid::math::Index l)
     {
 
-        int n = R.rows();
+      tsid::math::Index n = R.rows();
 #ifdef TRACE_SOLVER
         std::cerr << "Delete constraint " << l << ' ' << iq;
 #endif
-        int i, j, k, qq;
+	tsid::math::Index i, j, k, qq=0;
         double cc, ss, h, xny, t1, t2;
 
         /* Find the index qq for active constraint l to be removed */
         for (i = p; i < iq; i++)
-            if (A(i) == l)
+	  if (static_cast<tsid::math::Index>(A(i)) == l)
             {
                 qq = i;
                 break;
