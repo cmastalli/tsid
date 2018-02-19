@@ -57,7 +57,7 @@ namespace tsid
       assert(n==nVars);
       assert(neq==nEqCon);
       assert(nin==nIneqCon);
-      if ((n!=nVars) || (neq==nEqCon) || (nin==nIneqCon))
+      if ((n!=nVars) || (neq!=nEqCon) || (nin!=nIneqCon))
 	std::cerr << "(n!=nVars) || (neq==nEqCon) || (nin==nIneqCon)" << std::endl;
     }
     
